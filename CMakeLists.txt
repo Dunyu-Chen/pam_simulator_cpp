@@ -1,15 +1,59 @@
 cmake_minimum_required(VERSION 3.8)
 project(pam_simulator_cpp)
 
+# setup compile warning
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+# library target
+add_library(lib_simulator INTERFACE
+  include/pam_simulator_cpp/lib_simulator.h
+)
+target_include_directories(lib_simulator
+  INTERFACE
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
+target_link_libraries(lib_simulator
+  INTERFACE
+  Eigen3::Eigen
+)
+ament_target_dependencies(lib_simulator
+  INTERFACE
+  rclcpp)
+
+# install all library targets
+install(
+  DIRECTORY include/
+  DESTINATION include/${PROJECT_NAME}
+)
+install(
+  TARGETS lib_simulator
+  EXPORT export_${PROJECT_NAME}
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+# export all libraries
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(Eigen3::Eigen)
+
+# executable target
+add_executable(test_exec
+  src/test_exec.cpp)
+target_link_libraries(test_exec PUBLIC
+  lib_simulator
+)
+
+# install all executable targets
+install(
+  TARGETS test_exec
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
