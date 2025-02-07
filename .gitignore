@@ -1,0 +1,39 @@
+cmake-build-debug/
+.idea/
+
+# 忽略生成的文件和目录
+build/
+devel/
+install/
+logs/
+
+# 忽略本地配置和临时文件
+*.pyc
+*.pyo
+*~
+.thumbs/
+.cache/
+
+# 忽略ROS 2工作空间的特定文件
+AMENT_IGNORE
+
+# 忽略IDE生成的文件
+.vscode/
+.idea/
+
+# 忽略Mypy和pytest的缓存
+.mypy_cache/
+__pycache__/
+
+# 忽略Docker构建缓存
+.dockerenv
+.dockerignore
+
+# 忽略vcs工具生成的文件
+.vcs/
+
+# 忽略其他工具生成的文件
+*.bak
+*.swp
+*.tmp
+tags
