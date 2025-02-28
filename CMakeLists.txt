@@ -10,7 +10,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(Eigen3 REQUIRED)
-
+find_package(std_msgs REQUIRED)
 # library target
 add_library(lib_simulator INTERFACE
   include/pam_simulator_cpp/lib_simulator.h
@@ -19,13 +19,11 @@ target_include_directories(lib_simulator
   INTERFACE
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
-target_link_libraries(lib_simulator
-  INTERFACE
+target_link_libraries(lib_simulator INTERFACE
   Eigen3::Eigen
 )
-ament_target_dependencies(lib_simulator
-  INTERFACE
-  rclcpp)
+ament_target_dependencies(lib_simulator INTERFACE
+  rclcpp std_msgs)
 
 # install all library targets
 install(
@@ -49,10 +47,20 @@ add_executable(test_exec
 target_link_libraries(test_exec PUBLIC
   lib_simulator
 )
+ament_target_dependencies(test_exec PUBLIC
+  rclcpp std_msgs)
 
+add_executable(rigid_tank_node
+  src/rigid_tank_simulator_node.cpp
+)
+target_link_libraries(rigid_tank_node PUBLIC
+  lib_simulator
+)
+ament_target_dependencies(rigid_tank_node PUBLIC
+  rclcpp std_msgs)
 # install all executable targets
 install(
-  TARGETS test_exec
+  TARGETS test_exec rigid_tank_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
