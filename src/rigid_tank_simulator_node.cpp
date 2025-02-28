@@ -74,7 +74,9 @@ int main(int argc, char * argv[])
         volume_0,constants,valve_b,valve_c,sample_time
         );
     node_->simulator.reset(init_input,init_state);
+    RCLCPP_INFO(node_->get_logger(),"Starting rigid tank node");
     rclcpp::spin(node_);
     rclcpp::shutdown();
     return 0;
 }
+
