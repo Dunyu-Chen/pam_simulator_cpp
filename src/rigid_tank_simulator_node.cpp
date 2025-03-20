@@ -1,9 +1,9 @@
-#include "pam_simulator_cpp/lib_simulator.h"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include <functional>
 #include <chrono>
 #include <memory>
+#include "pam_simulator_cpp/lib_simulator.h"
 
 class Rigid_Tank_Node : public rclcpp::Node
 {
@@ -55,6 +55,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr subscription_;
 };
+
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
@@ -62,7 +63,7 @@ int main(int argc, char * argv[])
     Pneumatic_System_Constants constants;
     constants.pressure_supply = 5.0 * 1e5;// 500 KPa = 5 bar
     constants.pressure_air = 0.0; // 0 Pa
-    double volume_0 = 1.0 * 1e-3;// 1 L = 1e-3 m^3
+    double volume_0 = 5.0 * 1e-3;// 1 L = 1e-3 m^3
     double valve_b =0.38; // ratio
     double valve_c =0.4*1e-8; // 0.4 L/sbar = 0.4 * 1e-8 m^3/sPa
     Eigen::VectorXd init_state(1);
@@ -72,9 +73,8 @@ int main(int argc, char * argv[])
 
     auto node_ = std::make_shared<Rigid_Tank_Node>(
         volume_0,constants,valve_b,valve_c,sample_time
-        );
+    );
     node_->simulator.reset(init_input,init_state);
-    RCLCPP_INFO(node_->get_logger(),"Starting rigid tank node");
     rclcpp::spin(node_);
     rclcpp::shutdown();
     return 0;
