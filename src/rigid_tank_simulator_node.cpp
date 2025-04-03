@@ -8,7 +8,7 @@
 class Rigid_Tank_Node : public rclcpp::Node
 {
 public:
-    Rigid_Tank_Simulator simulator;
+    Rigid_Tank_Sim simulator;
     Rigid_Tank_Node(double volume_0,Pneumatic_System_Constants constants,double value_b,double value_c, double sample_time_s) :
         rclcpp::Node("Rigid_Tank_Node"),
         simulator(volume_0,constants,value_b,value_c,sample_time_s),

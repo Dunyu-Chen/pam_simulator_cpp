@@ -1,6 +1,7 @@
 #ifndef LIB_SIM_H
 #define LIB_SIM_H
 #include "Eigen/Dense"
+#include "torch/torch.h"
 
 template <int state_dim, int input_dim>
 class Simulator
@@ -133,6 +134,7 @@ public:
     {}
 
     double calculate_massflow(const double Pressure_up, const double Pressure_down) const
+    // absolute pressure
     {
         assert(Pressure_up > 0 && Pressure_down > 0);
         const double mid_term = Pressure_up * params.c_value * constants.air_density_ref
@@ -169,7 +171,11 @@ public:
     Binary_Valve inlet,outlet;
     double alpha_in, alpha_out, alpha_thermal;
 
-    Valve_Controlled_Chamber(const Pneumatic_System_Constants& Constants, const Binary_Valve_Params Inlet_params, const Binary_Valve_Params Outlet_params) :
+    Valve_Controlled_Chamber(
+        const Pneumatic_System_Constants& Constants,
+        const Binary_Valve_Params Inlet_params,
+        const Binary_Valve_Params Outlet_params
+    ) :
         constants(Constants),
         inlet_params(Inlet_params), outlet_params(Outlet_params),
         inlet(inlet_params,constants),
@@ -188,6 +194,7 @@ public:
         return {term_in, term_out, term_thermal};
     }
     double calculate_pressure_dot (const uint Inlet_state, const uint Outlet_state, const double Pressure, const double Volume, const double Volume_dot) const
+    // absolute pressure
     {
         const std::vector<double> terms = calculate_terms(Pressure,Volume,Volume_dot);
         double pressure_dot = terms[0]* Inlet_state + terms[1] * Outlet_state + terms[2];
@@ -202,7 +209,7 @@ public:
     Valve_Controlled_Chamber chamber;
     double volume_0 ;
     double inertia_mass;
-
+    // states = [displacement, velocity, volume, delta_pressure]
     Linear_Pneumatic_Actuator
     (
         const Binary_Valve_Params Inlet_params,
@@ -239,7 +246,7 @@ public:
         State_dots[3] = this->chamber.calculate_pressure_dot(
             static_cast<uint>(Inputs[0]),
             static_cast<uint>(Inputs[1]),
-            States[3],
+            States[3]+constants.pressure_air,
             volume_[0],
             volume_[1]
         );
@@ -249,7 +256,7 @@ public:
 
     virtual std::vector<double> calculate_volume_dynamic(double displacement,double velocity) const
     {
-        double volume = std::max(volume_0,1e-10);
+        double volume = std::max(volume_0,1e-20);
         double volume_dot = 0.0;
         return {volume,volume_dot};
     }
@@ -265,11 +272,17 @@ class Rigid_Tank_Sim : public  Linear_Pneumatic_Actuator
 public:
     Rigid_Tank_Sim(
         const double Volume,
-        const Binary_Valve_Params Valve_params,
+        const Binary_Valve_Params Inlet_params,
+        const Binary_Valve_Params Outlet_params,
         const Pneumatic_System_Constants& Constants,
         const double Sample_time
     ) :
-        Linear_Pneumatic_Actuator(Valve_params, Valve_params, Constants, Sample_time)
+        Linear_Pneumatic_Actuator
+        (
+            Inlet_params,
+            Outlet_params,
+            Constants, Sample_time
+        )
     {
         this->volume_0 = Volume;
     }
@@ -277,7 +290,7 @@ public:
     std::vector<double> calculate_volume_dynamic(double displacement,double velocity) const override
     {
         // constant volume for rigid tank
-        double volume = std::max(volume_0, 1e-10);
+        double volume = std::max(volume_0, 1e-20);
         double volume_dot = 0.0;
         return {volume, volume_dot};
     }
@@ -298,13 +311,13 @@ public:
     double max_length,min_length;
     Cylinder_Sim(
         double Area, double Max_length,double Min_length,double Volume_0,
-        Binary_Valve_Params Valve_params,
+        Binary_Valve_Params Inlet_valve, Binary_Valve_Params Outlet_valve,
         Pneumatic_System_Constants Constants,
         double Sample_time
     ) :
         Linear_Pneumatic_Actuator(
-            Valve_params,
-            Valve_params,
+            Inlet_valve,
+            Outlet_valve,
             Constants,
             Sample_time),
         area(Area),
@@ -330,7 +343,7 @@ public:
             elements[1] = -0.02 * 1e3; // B = N/m/s = 1e-3 Ns/mm
         }
         else {elements[1] = -0.01 * 1e3;}
-        elements[2] =  area - (constants.pressure_air/States[3])*area;
+        elements[2] =  area;
         return elements;
     }
 };

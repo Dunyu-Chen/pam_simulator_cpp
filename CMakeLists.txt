@@ -11,12 +11,8 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 add_executable(test_exec src/test_exec.cpp)
-target_link_libraries(test_exec PUBLIC lib_simulator)
+target_link_libraries(test_exec PUBLIC lib_simulator lib_deepLearning)
 ament_target_dependencies(test_exec PUBLIC rclcpp std_msgs)
-
-add_executable(rigid_tank_node src/rigid_tank_simulator_node.cpp)
-target_link_libraries(rigid_tank_node PUBLIC lib_simulator)
-ament_target_dependencies(rigid_tank_node PUBLIC rclcpp std_msgs)
 
 install(
   TARGETS test_exec
@@ -30,13 +26,23 @@ target_include_directories(lib_simulator INTERFACE
     "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 target_link_libraries(lib_simulator INTERFACE
     Eigen3::Eigen "${TORCH_LIBRARIES}")
+
+add_library(lib_deepLearning INTERFACE
+        include/pam_simulator_cpp/lib_deepLearning.h
+)
+target_include_directories(lib_deepLearning INTERFACE
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
+target_link_libraries(lib_deepLearning INTERFACE
+        Eigen3::Eigen "${TORCH_LIBRARIES}")
+
 # ament_target_dependencies(my_library INTERFACE rclcpp)
 install(
     DIRECTORY include/
     DESTINATION include/${PROJECT_NAME}
 )
 install(
-    TARGETS lib_simulator
+    TARGETS lib_simulator lib_deepLearning
     EXPORT export_${PROJECT_NAME}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
