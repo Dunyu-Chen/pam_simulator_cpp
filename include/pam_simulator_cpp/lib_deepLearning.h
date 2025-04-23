@@ -3,61 +3,51 @@
 
 #include "torch/torch.h"
 
+class Dynamic_RBF_Net : public torch::nn::Module
+{
+public:
+    int input_size,hidden_size,output_size;
+    torch::nn::LSTM rbf_params_gen;
+    torch::nn::Linear output_mapper;
+    Dynamic_RBF_Net(int Input_size,int Hidden_size, int Output_size) :
+        input_size(Input_size), hidden_size(Hidden_size), output_size(Output_size),
+        rbf_params_gen(
+            register_module(
+                "rbf_params_gen",
+                torch::nn::LSTM(
+                    torch::nn::LSTMOptions(input_size,(input_size+1)*hidden_size)// i x h centers ; h spreads
+                    .batch_first(true).num_layers(1)
+                )
+            )
+        ),
+        output_mapper(
+            register_module(
+                "output_mapper",
+                torch::nn::Linear(
+                    torch::nn::LinearOptions(hidden_size,output_size)
+                )
+            )
+        )
+    {}
 
-// class Dynamic_RBF_Net : public torch::nn::Module
-// {
-// public:
-//     uint input_size,hidden_size,output_size;
-//     torch::nn::LSTM lstm_centers; // {input,hidden*input}
-//     torch::nn::LSTM lstm_spreads; // {input,hidden}
-//     torch::nn::Linear linear_layer; // {hidden,output}
-//     Dynamic_RBF_Net(uint Input_size, uint Hidden_size, uint Output_size) :
-//         input_size(Input_size),hidden_size(Hidden_size),output_size(Output_size),
-//         lstm_centers(
-//             register_module("lstm_centers",
-//                 torch::nn::LSTM(
-//                     torch::nn::LSTMOptions(input_size, hidden_size*input_size)
-//                         .batch_first(true)
-//                         .num_layers(1)
-//                 )
-//             )
-//         ),
-//         lstm_spreads(
-//             register_module("lstm_spreads",
-//                 torch::nn::LSTM(
-//                     torch::nn::LSTMOptions(input_size, hidden_size)
-//                         .batch_first(true)
-//                         .num_layers(1)
-//                 )
-//             )
-//         ),
-//         linear_layer(
-//             register_module("linear_layer",
-//                 torch::nn::Linear(
-//                     torch::nn::LinearOptions(hidden_size, output_size)
-//                 )
-//             )
-//         )
-//     {}
-//     torch::Tensor forward(torch::Tensor Inputs) // {batch,sequence,input}
-//     {
-//         TORCH_CHECK(Inputs.size(-1) == input_size);
-//         //Inputs {batch,sequence,Input}
-//         auto [centers,centers_hidden_states] = lstm_centers->forward(Inputs); // centers {batch,sequence,hidden*input}
-//         auto [spreads,spreads_hidden_states] = lstm_spreads->forward(Inputs); // spreads {batch,sequence,hidden}
-//         //std::cout<<centers<<std::endl;
-//         auto mapped_centers = centers.view({Inputs.size(0),Inputs.size(1),hidden_size,input_size}); // {b,s,h,d}
-//         //std::cout<<mapped_centers<<std::endl;
-//         //todo: 对 centers 和 spreads 进行约束 保证安全
-//         auto expended_inputs = Inputs.unsqueeze(-2);
-//         //std::cout<<expended_inputs<<std::endl;
-//         auto distances = torch::norm(expended_inputs-mapped_centers,2,-1); //{b,s,1,d} - {b,s,h,d} -> {b,s,h,d} -> {b,s,h}
-//         //std::cout<<distances<<std::endl;
-//         return linear_layer->forward(
-//             torch::exp(-spreads*distances.pow(2)) // {batch,sequence,hidden}
-//         ); // batch,sequence,output
-//     }
-// };
+    torch::Tensor forward(torch::Tensor Inputs)
+    {
+        auto [raw_rbf_params,rbf_params_gen_hidden_states] = rbf_params_gen->forward(Inputs); // {b,s,(i+1)*h}
+        auto flattened_rbf_params = raw_rbf_params.view({Inputs.size(0),Inputs.size(1),hidden_size,input_size+1}); // {b,s,h,i} 展开参数方便取值与广播
+        auto centers = flattened_rbf_params.slice(-1,0,-1,1); // {b,s,h,i} 取最后一维前 i 个元素构建rbf centers
+        auto spreads =
+            torch::clamp(
+                torch::softplus(flattened_rbf_params.slice(-1,-1,INT64_MAX,1).squeeze(-1))
+                ,1e-3,5.0
+            ); // {b,s,h} 取最后一维最后一个元素构建 spreads 限制其范围
+        auto distance = torch::norm(Inputs.unsqueeze(-2)-centers,2,-1); //{b,s,1,i} - {b,s,h,i} -> {b,s,h,i} ->norm^2-> {b,s,h}
+        auto rbf_outputs = torch::exp(
+            torch::clamp(-spreads*distance.pow(2),-50.0,50.0)
+        ); // {b,s,h}*{b,s,h} -> {b,s,h}
+        auto outputs = torch::tanh(output_mapper->forward(rbf_outputs));// {b,s,h} -> {b,s,o}
+        return outputs;
+    }
+};
 
 class Dynamic_LSTM_RBF_Net : public torch::nn::Module
 {
